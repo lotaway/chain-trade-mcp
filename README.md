@@ -13,7 +13,7 @@ An MCP server implemented in Rust that enables AI agents to interact with the Et
 ### Prerequisites
 
 - Rust (latest stable)
-- An Ethereum RPC URL (e.g., from Alchemy or Infura)
+- An Ethereum RPC URL, already set a public free RPC URL inside the `src/config/mod.rs`, but a paid RPC URL will be better (e.g., from Alchemy or Infura)
 
 ### Configuration
 
