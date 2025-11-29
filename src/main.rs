@@ -1,11 +1,13 @@
 mod config;
 mod domain;
 mod infrastructure;
-mod interface;
+mod server;
 
 use config::Config;
 use infrastructure::cache::CacheService;
 use infrastructure::notification::NotificationService;
+use rmcp::ServiceExt;
+use tokio::io::{stdin, stdout};
 use tracing::info;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -35,7 +37,16 @@ async fn main() -> anyhow::Result<()> {
 
     let eth_client = infrastructure::ethereum::EthereumClient::new(config, cache, notifier).await?;
 
-    interface::mcp::run(eth_client).await?;
+    // Create the MCP server using rmcp SDK
+    let server = server::ChainTradeServer::new(eth_client);
+
+    // Use stdin/stdout as transport (standard MCP pattern)
+    let transport = (stdin(), stdout());
+
+    info!("MCP server initialized, starting to serve requests...");
+
+    // Start serving MCP requests
+    server.serve(transport).await?;
 
     Ok(())
 }
