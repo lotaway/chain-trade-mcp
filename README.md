@@ -2,6 +2,10 @@
 
 An MCP (Model Context Protocol) server implemented in Rust using the official `rmcp` SDK. Enables AI agents to interact with the Ethereum blockchain for querying balances, checking token prices, and simulating Uniswap token swaps.
 
+## Code Priceples
+
+Follow the code priceples in file:`CODE_PINCEPLES/CODE_PRICEPLES`
+
 ## Features
 
 - **`get_balance`**: Query ETH and ERC20 token balances.
