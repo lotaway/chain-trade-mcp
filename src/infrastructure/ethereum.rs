@@ -2,9 +2,10 @@ use crate::config::Config;
 use crate::domain::{Balance, SwapQuote, Token};
 use crate::infrastructure::cache::CacheService;
 use crate::infrastructure::notification::NotificationService;
+use crate::infrastructure::rpc::{RateLimiter, RpcConnectionPool};
 use alloy::{
     primitives::{utils::format_units, Address, U256},
-    providers::{Provider, ProviderBuilder, RootProvider},
+    providers::{Provider, RootProvider},
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
     sol,
@@ -12,6 +13,8 @@ use alloy::{
 };
 use anyhow::Result;
 use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::error;
 use url::Url;
 
@@ -25,7 +28,8 @@ sol! {
 }
 
 pub struct EthereumClient {
-    provider: RootProvider<Http<Client>>,
+    pool: Arc<RpcConnectionPool>,
+    rate_limiter: Arc<RateLimiter>,
     #[allow(dead_code)]
     signer: Option<PrivateKeySigner>,
     config: Config,
@@ -39,8 +43,13 @@ impl EthereumClient {
         cache: CacheService,
         notifier: NotificationService,
     ) -> Result<Self> {
-        let url = Url::parse(&config.rpc_url)?;
-        let provider = ProviderBuilder::new().on_http(url);
+        let timeout = Duration::from_secs(30);
+        let pool = Arc::new(
+            RpcConnectionPool::new(&config.rpc_url, timeout)
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?,
+        );
+        let rate_limiter = Arc::new(RateLimiter::new(100, 1000));
 
         let signer = if let Some(pk) = &config.private_key {
             Some(PrivateKeySigner::from_str(pk)?)
@@ -49,7 +58,8 @@ impl EthereumClient {
         };
 
         Ok(Self {
-            provider,
+            pool,
+            rate_limiter,
             signer,
             config,
             cache,
@@ -84,11 +94,19 @@ impl EthereumClient {
     }
 
     async fn fetch_balance(&self, address: &str, token_address: Option<&str>) -> Result<Balance> {
+        // Apply rate limiting before RPC call
+        if !self.rate_limiter.acquire().await {
+            return Err(anyhow::anyhow!(
+                "Rate limit exceeded while fetching balance"
+            ));
+        }
+
         let addr = Address::from_str(address)?;
+        let provider = self.pool.provider();
 
         if let Some(token_addr_str) = token_address {
             let token_addr = Address::from_str(token_addr_str)?;
-            let contract = IERC20::new(token_addr, &self.provider);
+            let contract = IERC20::new(token_addr, provider);
 
             let balance = contract.balanceOf(addr).call().await?._0;
             let decimals = contract.decimals().call().await?._0;
@@ -106,7 +124,7 @@ impl EthereumClient {
                 formatted,
             })
         } else {
-            let balance = self.provider.get_balance(addr).await?;
+            let balance = provider.get_balance(addr).await?;
             let formatted = format_units(balance, 18)?;
 
             Ok(Balance {
@@ -140,8 +158,16 @@ impl EthereumClient {
     }
 
     async fn fetch_token_price(&self, token_address: &str) -> Result<String> {
+        // Apply rate limiting before RPC call
+        if !self.rate_limiter.acquire().await {
+            return Err(anyhow::anyhow!(
+                "Rate limit exceeded while fetching token price"
+            ));
+        }
+
         let usdc = Address::from_str(&self.config.usdc_address)?;
         let token = Address::from_str(token_address)?;
+        let provider = self.pool.provider();
 
         if token == usdc {
             return Ok("1.0".to_string());
@@ -162,13 +188,12 @@ impl EthereumClient {
             }
         }
 
-        let quoter = IQuoterV2::new(quoter_addr, &self.provider);
-        let token_contract = IERC20::new(token, &self.provider);
+        let quoter = IQuoterV2::new(quoter_addr, provider);
+        let token_contract = IERC20::new(token, provider);
         let decimals = token_contract.decimals().call().await?._0;
         let amount_in = U256::from(10).pow(U256::from(decimals));
 
-        let fee = self.config.uniswap_fee_tier as u32; // Use config
-                                                       // Note: alloy sol! types might expect uint24, so we cast.
+        let fee = self.config.uniswap_fee_tier as u32;
         let fee_24 = fee as u32;
 
         let quote = quoter
@@ -208,10 +233,16 @@ impl EthereumClient {
         amount: &str,
         slippage: Option<f64>,
     ) -> Result<SwapQuote> {
+        // Apply rate limiting before RPC call
+        if !self.rate_limiter.acquire().await {
+            return Err(anyhow::anyhow!("Rate limit exceeded while simulating swap"));
+        }
+
         let from = Address::from_str(from_token)?;
         let to = Address::from_str(to_token)?;
+        let provider = self.pool.provider();
 
-        let from_contract = IERC20::new(from, &self.provider);
+        let from_contract = IERC20::new(from, provider);
         let decimals = from_contract.decimals().call().await?._0;
 
         let amount_in = if let Ok(u) = U256::from_str(amount) {
@@ -252,7 +283,7 @@ impl EthereumClient {
             sqrtPriceLimitX96: U256::ZERO,
         };
 
-        let router = ISwapRouter::new(router_addr, &self.provider);
+        let router = ISwapRouter::new(router_addr, provider);
         let calldata = router.exactInputSingle(params).calldata().to_owned();
 
         let tx = TransactionRequest::default()
@@ -260,10 +291,10 @@ impl EthereumClient {
             .to(router_addr)
             .input(calldata.into());
 
-        let output = self.provider.call(&tx).await?;
+        let output = provider.call(&tx).await?;
         let amount_out = U256::from_be_slice(&output);
 
-        let to_contract = IERC20::new(to, &self.provider);
+        let to_contract = IERC20::new(to, provider);
         let to_decimals = to_contract.decimals().call().await?._0;
         let formatted_out = format_units(amount_out, to_decimals)?;
 

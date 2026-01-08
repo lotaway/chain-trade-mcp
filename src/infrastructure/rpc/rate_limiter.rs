@@ -3,9 +3,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
 
-const DEFAULT_TOKENS: u64 = 100;
-const REFILL_INTERVAL_MS: u64 = 1000;
-
 fn now_ms() -> u64 {
     Instant::now().elapsed().as_millis() as u64
 }
