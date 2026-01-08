@@ -1,26 +1,11 @@
-use serde::{Deserialize, Serialize};
+pub mod model;
+pub mod repository;
+pub mod service;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Token {
-    pub address: String,
-    pub symbol: String,
-    pub decimals: u8,
-}
+pub use model::balance::Balance;
+pub use model::swap_quote::SwapQuote;
+pub use model::token::Token;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Balance {
-    pub token: Option<Token>, // None for ETH
-    pub amount: String,
-    pub formatted: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SwapQuote {
-    pub from_token: String,
-    pub to_token: String,
-    pub input_amount: String,
-    pub estimated_output: String,
-    pub gas_estimate: String,
-    pub simulation_success: bool,
-    pub error_message: Option<String>,
-}
+pub use repository::balance_repository::BalanceRepository;
+pub use repository::price_repository::PriceRepository;
+pub use repository::swap_repository::SwapRepository;

@@ -54,7 +54,7 @@ impl Config {
             .ok()
             .filter(|s| !s.is_empty())
             .and_then(|s| s.parse().ok())
-            .unwrap_or(5);
+            .unwrap_or(60);
 
         let smtp_host = env::var("SMTP_HOST").ok().filter(|s| !s.is_empty());
         let smtp_user = env::var("SMTP_USER").ok().filter(|s| !s.is_empty());
