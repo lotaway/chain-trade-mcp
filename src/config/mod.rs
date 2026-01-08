@@ -19,6 +19,9 @@ pub struct Config {
     pub usdc_address: String,
     pub uniswap_quoter_address: String,
     pub uniswap_router_address: String,
+    // Rate limiter settings
+    pub rate_limit_max_tokens: u64,
+    pub rate_limit_refill_interval_ms: u64,
 }
 
 impl Config {
@@ -78,6 +81,19 @@ impl Config {
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45".to_string());
 
+        // Rate limiter settings
+        let rate_limit_max_tokens = env::var("RATE_LIMIT_MAX_TOKENS")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(100);
+
+        let rate_limit_refill_interval_ms = env::var("RATE_LIMIT_REFILL_INTERVAL_MS")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1000);
+
         Ok(Config {
             rpc_url,
             private_key,
@@ -93,6 +109,8 @@ impl Config {
             usdc_address,
             uniswap_quoter_address,
             uniswap_router_address,
+            rate_limit_max_tokens,
+            rate_limit_refill_interval_ms,
         })
     }
 }

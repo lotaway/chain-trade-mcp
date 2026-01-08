@@ -49,7 +49,10 @@ impl EthereumClient {
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?,
         );
-        let rate_limiter = Arc::new(RateLimiter::new(100, 1000));
+        let rate_limiter = Arc::new(RateLimiter::new(
+            config.rate_limit_max_tokens,
+            config.rate_limit_refill_interval_ms,
+        ));
 
         let signer = if let Some(pk) = &config.private_key {
             Some(PrivateKeySigner::from_str(pk)?)
