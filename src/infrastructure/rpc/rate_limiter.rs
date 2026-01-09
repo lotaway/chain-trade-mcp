@@ -3,10 +3,7 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Rate limiter using the governor crate's token bucket implementation.
-/// Uses direct check for fire-and-forget style rate limiting.
 pub struct RpcRateLimiter {
-    // Use Arc for thread-safe access in multi-threaded runtime
     inner: Arc<DefaultDirectRateLimiter>,
 }
 
@@ -19,7 +16,6 @@ impl Clone for RpcRateLimiter {
 }
 
 impl RpcRateLimiter {
-    /// Create a new rate limiter with max_tokens and refill_interval_ms
     pub fn new(max_tokens: u64, refill_interval_ms: u64) -> Self {
         let quota = Quota::with_period(Duration::from_millis(refill_interval_ms))
             .expect("Valid quota")
@@ -33,13 +29,10 @@ impl RpcRateLimiter {
         }
     }
 
-    /// Try to acquire a permit. Returns true if permitted, false if rate limited.
     pub fn check(&self) -> bool {
         self.inner.check().is_ok()
     }
 
-    /// Try to acquire a permit asynchronously. Returns true if permitted, false if rate limited.
-    /// This is the correct async method for fire-and-forget style rate limiting.
     #[allow(dead_code)]
     pub async fn acquire(&self) -> bool {
         self.check()
