@@ -4,7 +4,7 @@ use crate::domain::{
 };
 use crate::infrastructure::cache::CacheService;
 use crate::infrastructure::notification::NotificationService;
-use crate::infrastructure::rpc::{RateLimiter, RpcConnectionPool};
+use crate::infrastructure::rpc::{RpcConnectionPool, RpcRateLimiter};
 use alloy::primitives::utils::format_units;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
@@ -57,7 +57,7 @@ sol! {
 
 pub struct EthereumRepository {
     pool: Arc<RpcConnectionPool>,
-    rate_limiter: Arc<RateLimiter>,
+    rate_limiter: Arc<RpcRateLimiter>,
     config: Config,
     cache: CacheService,
     notifier: NotificationService,
@@ -67,7 +67,7 @@ pub struct EthereumRepository {
 impl EthereumRepository {
     pub fn new(
         pool: Arc<RpcConnectionPool>,
-        rate_limiter: Arc<RateLimiter>,
+        rate_limiter: Arc<RpcRateLimiter>,
         config: Config,
         cache: CacheService,
         notifier: NotificationService,

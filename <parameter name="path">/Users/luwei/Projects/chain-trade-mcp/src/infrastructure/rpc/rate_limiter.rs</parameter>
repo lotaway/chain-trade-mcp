@@ -1,21 +1,21 @@
-use governor::{DefaultDirectRateLimiter, Quota};
+<parameter name="content">use governor::{DefaultDirectRateLimiter, Quota};
 use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Rate limiter using the governor crate's token bucket implementation.
 /// Uses direct check for fire-and-forget style rate limiting.
+#[derive(Clone)]
 pub struct RpcRateLimiter {
     // Use Arc for thread-safe access in multi-threaded runtime
-    inner: Arc<DefaultDirectRateLimiter>,
+    inner: Arc<RateLimiterInner>,
 }
 
-impl Clone for RpcRateLimiter {
-    fn clone(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
-        }
-    }
+#[derive(Clone)]
+struct RateLimiterInner {
+    limiter: DefaultDirectRateLimiter,
+    max_tokens: u64,
+    refill_interval: Duration,
 }
 
 impl RpcRateLimiter {
@@ -26,16 +26,20 @@ impl RpcRateLimiter {
             .allow_burst(NonZeroU32::new(max_tokens as u32).expect("Non-zero max tokens"));
 
         let clock = governor::clock::DefaultClock::default();
-        let limiter = governor::RateLimiter::direct_with_clock(quota, &clock);
+        let limiter = DefaultDirectRateLimiter::direct_with_clock(quota, &clock);
 
         Self {
-            inner: Arc::new(limiter),
+            inner: Arc::new(RateLimiterInner {
+                limiter,
+                max_tokens,
+                refill_interval: Duration::from_millis(refill_interval_ms),
+            }),
         }
     }
 
     /// Try to acquire a permit. Returns true if permitted, false if rate limited.
     pub fn check(&self) -> bool {
-        self.inner.check().is_ok()
+        self.inner.limiter.check().is_ok()
     }
 
     /// Try to acquire a permit asynchronously. Returns true if permitted, false if rate limited.
@@ -44,4 +48,15 @@ impl RpcRateLimiter {
     pub async fn acquire(&self) -> bool {
         self.check()
     }
+
+    /// Get the max tokens configuration
+    pub fn max_tokens(&self) -> u64 {
+        self.inner.max_tokens
+    }
+
+    /// Get the refill interval configuration
+    pub fn refill_interval(&self) -> Duration {
+        self.inner.refill_interval
+    }
 }
+</parameter>

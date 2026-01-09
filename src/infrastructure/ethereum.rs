@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::domain::{Balance, SwapQuote, Token};
 use crate::infrastructure::cache::CacheService;
 use crate::infrastructure::notification::NotificationService;
-use crate::infrastructure::rpc::{RateLimiter, RpcConnectionPool};
+use crate::infrastructure::rpc::{RpcConnectionPool, RpcRateLimiter};
 use alloy::{
     primitives::{utils::format_units, Address, U256},
     providers::{Provider, RootProvider},
@@ -29,7 +29,7 @@ sol! {
 
 pub struct EthereumClient {
     pool: Arc<RpcConnectionPool>,
-    rate_limiter: Arc<RateLimiter>,
+    rate_limiter: Arc<RpcRateLimiter>,
     #[allow(dead_code)]
     signer: Option<PrivateKeySigner>,
     config: Config,
@@ -49,7 +49,7 @@ impl EthereumClient {
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?,
         );
-        let rate_limiter = Arc::new(RateLimiter::new(
+        let rate_limiter = Arc::new(RpcRateLimiter::new(
             config.rate_limit_max_tokens,
             config.rate_limit_refill_interval_ms,
         ));
