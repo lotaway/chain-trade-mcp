@@ -19,11 +19,33 @@ mod config_tests {
         assert!(config.is_ok());
 
         let config = config.unwrap();
-        assert_eq!(config.rpc_url, "https://1rpc.io/eth");
+        assert_eq!(config.rpc_urls, vec!["https://1rpc.io/eth"]);
         assert_eq!(config.port, 3000);
         assert_eq!(config.default_slippage, 0.005);
         assert_eq!(config.uniswap_fee_tier, 3000);
         assert_eq!(config.cache_ttl, 60);
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_load_with_multiple_rpc_urls() {
+        env::set_var(
+            "RPC_URL",
+            "https://1rpc.io/eth,https://eth.llamarpc.com,https://rpc.ankr.com/eth",
+        );
+        env::remove_var("PORT");
+        env::remove_var("DEFAULT_SLIPPAGE");
+        env::remove_var("UNISWAP_FEE_TIER");
+        env::remove_var("CACHE_TTL");
+
+        let config = chain_trade_mcp::config::Config::load();
+        assert!(config.is_ok());
+
+        let config = config.unwrap();
+        assert_eq!(config.rpc_urls.len(), 3);
+        assert_eq!(config.rpc_urls[0], "https://1rpc.io/eth");
+        assert_eq!(config.rpc_urls[1], "https://eth.llamarpc.com");
+        assert_eq!(config.rpc_urls[2], "https://rpc.ankr.com/eth");
     }
 
     #[test]
@@ -40,7 +62,7 @@ mod config_tests {
         assert!(config.is_ok());
 
         let config = config.unwrap();
-        assert_eq!(config.rpc_url, "https://1rpc.io/eth");
+        assert_eq!(config.rpc_urls, vec!["https://1rpc.io/eth"]);
         assert_eq!(config.port, 8080);
         assert_eq!(config.default_slippage, 0.01);
         assert_eq!(config.uniswap_fee_tier, 500);

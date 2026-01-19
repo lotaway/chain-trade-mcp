@@ -1,10 +1,10 @@
-use crate::config::Config;
+use crate::config::{Config, RpcConnectionPool};
 use crate::domain::{
     Balance, BalanceRepository, PriceRepository, SwapQuote, SwapRepository, Token,
 };
 use crate::infrastructure::cache::CacheService;
 use crate::infrastructure::notification::NotificationService;
-use crate::infrastructure::rpc::{RpcConnectionPool, RpcRateLimiter};
+use crate::infrastructure::rpc::RpcRateLimiter;
 use alloy::primitives::utils::format_units;
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
