@@ -29,7 +29,6 @@ sol! {
 pub struct EthereumClient {
     load_balancer: Arc<RpcLoadBalancer>,
     rate_limiter: Arc<RpcRateLimiter>,
-    #[allow(dead_code)]
     signer: Option<PrivateKeySigner>,
     config: Config,
     cache: CacheService,
@@ -69,11 +68,22 @@ impl EthereumClient {
         })
     }
 
-    /// Select a URL using load balancer and get its provider
-    fn select_and_get_provider(&self) -> (usize, &RootProvider<Http<Client>>) {
+    fn select_and_get_provider(&self) -> (usize, &impl Provider<Http<Client>>) {
         let index = self.load_balancer.select();
         let provider = self.load_balancer.get_provider(index);
         (index, provider)
+    }
+
+    pub fn get_signer(&self) -> Option<&PrivateKeySigner> {
+        self.signer.as_ref()
+    }
+
+    pub fn get_config(&self) -> &Config {
+        &self.config
+    }
+
+    pub fn get_provider(&self) -> &RootProvider<Http<Client>> {
+        self.load_balancer.get_provider(self.load_balancer.select())
     }
 
     pub async fn get_balance(&self, address: &str, token_address: Option<&str>) -> Result<Balance> {
@@ -103,7 +113,6 @@ impl EthereumClient {
     }
 
     async fn fetch_balance(&self, address: &str, token_address: Option<&str>) -> Result<Balance> {
-        // Apply rate limiting before RPC call
         if !self.rate_limiter.acquire().await {
             return Err(anyhow::anyhow!(
                 "Rate limit exceeded while fetching balance"
@@ -143,7 +152,6 @@ impl EthereumClient {
             })
         };
 
-        // Record result for load balancing
         if result.is_ok() {
             self.load_balancer.record_success(index);
         } else {
@@ -176,7 +184,6 @@ impl EthereumClient {
     }
 
     async fn fetch_token_price(&self, token_address: &str) -> Result<String> {
-        // Apply rate limiting before RPC call
         if !self.rate_limiter.acquire().await {
             return Err(anyhow::anyhow!(
                 "Rate limit exceeded while fetching token price"
@@ -212,15 +219,13 @@ impl EthereumClient {
         let amount_in = U256::from(10).pow(U256::from(decimals));
 
         let fee = self.config.uniswap_fee_tier as u32;
-        let fee_24 = fee as u32;
 
         let quote = quoter
-            .quoteExactInputSingle(token, usdc, fee_24, amount_in, U256::ZERO)
+            .quoteExactInputSingle(token, usdc, fee, amount_in, U256::ZERO)
             .call()
             .await?;
         let amount_out = quote.amountOut;
 
-        // Record result for load balancing
         self.load_balancer.record_success(index);
 
         let price = format_units(amount_out, 6)?;
@@ -255,7 +260,6 @@ impl EthereumClient {
         amount: &str,
         slippage: Option<f64>,
     ) -> Result<SwapQuote> {
-        // Apply rate limiting before RPC call
         if !self.rate_limiter.acquire().await {
             return Err(anyhow::anyhow!("Rate limit exceeded while simulating swap"));
         }
@@ -316,14 +320,12 @@ impl EthereumClient {
         let output = provider.call(&tx).await?;
         let amount_out = U256::from_be_slice(&output);
 
-        // Record success
         self.load_balancer.record_success(index);
 
         let to_contract = IERC20::new(to, provider);
         let to_decimals = to_contract.decimals().call().await?._0;
         let formatted_out = format_units(amount_out, to_decimals)?;
 
-        // Use slippage to calculate minimum acceptable output
         let slippage_tolerance = slippage.unwrap_or(self.config.default_slippage);
         let min_output = amount_out
             .saturating_mul(U256::from((10000.0 * (1.0 - slippage_tolerance)) as u64))
@@ -343,10 +345,10 @@ impl EthereumClient {
             gas_estimate: "Unknown".to_string(),
             simulation_success: true,
             error_message: None,
+            tx_hash: None,
         })
     }
 
-    /// Get load balancer statistics (for debugging/monitoring)
     #[allow(dead_code)]
     pub fn get_load_balancer_stats(&self) -> Vec<(String, usize, f64)> {
         let mut stats = Vec::new();

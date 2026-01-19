@@ -61,6 +61,7 @@ mod domain_tests {
             gas_estimate: "150000".to_string(),
             simulation_success: true,
             error_message: None,
+            tx_hash: None,
         };
 
         assert!(quote.simulation_success);
@@ -79,6 +80,7 @@ mod domain_tests {
             gas_estimate: "0".to_string(),
             simulation_success: false,
             error_message: Some("Insufficient liquidity".to_string()),
+            tx_hash: None,
         };
 
         assert!(!quote.simulation_success);
@@ -96,6 +98,7 @@ mod domain_tests {
             gas_estimate: "150000".to_string(),
             simulation_success: true,
             error_message: None,
+            tx_hash: None,
         };
 
         let json = serde_json::to_string(&quote).unwrap();

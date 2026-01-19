@@ -15,20 +15,19 @@ pub struct Config {
     pub smtp_pass: Option<String>,
     pub smtp_from: Option<String>,
     pub smtp_to: Option<String>,
-    // Contract addresses
     pub usdc_address: String,
     pub uniswap_quoter_address: String,
     pub uniswap_router_address: String,
-    // Rate limiter settings
     pub rate_limit_max_tokens: u64,
     pub rate_limit_refill_interval_ms: u64,
+    pub max_slippage: Option<f64>,
+    pub max_gas_limit: Option<u64>,
 }
 
 impl Config {
     pub fn load() -> Result<Self> {
         dotenv().ok();
 
-        // Parse RPC URLs from comma-separated list
         let rpc_urls: Vec<String> = env::var("RPC_URL")
             .ok()
             .filter(|s| !s.is_empty())
@@ -38,7 +37,6 @@ impl Config {
             .filter(|s| !s.is_empty())
             .collect();
 
-        // Fallback to single default if none provided
         let rpc_urls = if rpc_urls.is_empty() {
             vec!["https://1rpc.io/eth".to_string()]
         } else {
@@ -77,7 +75,6 @@ impl Config {
         let smtp_from = env::var("SMTP_FROM").ok().filter(|s| !s.is_empty());
         let smtp_to = env::var("SMTP_TO").ok().filter(|s| !s.is_empty());
 
-        // Contract addresses with mainnet defaults
         let usdc_address = env::var("USDC_ADDRESS")
             .ok()
             .filter(|s| !s.is_empty())
@@ -93,7 +90,6 @@ impl Config {
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45".to_string());
 
-        // Rate limiter settings
         let rate_limit_max_tokens = env::var("RATE_LIMIT_MAX_TOKENS")
             .ok()
             .filter(|s| !s.is_empty())
@@ -105,6 +101,16 @@ impl Config {
             .filter(|s| !s.is_empty())
             .and_then(|s| s.parse().ok())
             .unwrap_or(1000);
+
+        let max_slippage = env::var("MAX_SLIPPAGE")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .and_then(|s| s.parse().ok());
+
+        let max_gas_limit = env::var("MAX_GAS_LIMIT")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .and_then(|s| s.parse().ok());
 
         Ok(Config {
             rpc_urls,
@@ -123,6 +129,8 @@ impl Config {
             uniswap_router_address,
             rate_limit_max_tokens,
             rate_limit_refill_interval_ms,
+            max_slippage,
+            max_gas_limit,
         })
     }
 }
@@ -133,7 +141,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-/// Single RPC connection pool for one URL
 #[derive(Clone)]
 pub struct RpcConnectionPool {
     provider: Arc<RootProvider<Http<Client>>>,

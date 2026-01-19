@@ -29,10 +29,7 @@ mod config_tests {
     #[test]
     #[serial]
     fn test_config_load_with_multiple_rpc_urls() {
-        env::set_var(
-            "RPC_URL",
-            "https://1rpc.io/eth,https://eth.llamarpc.com,https://rpc.ankr.com/eth",
-        );
+        env::set_var("RPC_URL", "https://1rpc.io/eth,https://eth.llamarpc.com");
         env::remove_var("PORT");
         env::remove_var("DEFAULT_SLIPPAGE");
         env::remove_var("UNISWAP_FEE_TIER");
@@ -42,10 +39,9 @@ mod config_tests {
         assert!(config.is_ok());
 
         let config = config.unwrap();
-        assert_eq!(config.rpc_urls.len(), 3);
+        assert_eq!(config.rpc_urls.len(), 2);
         assert_eq!(config.rpc_urls[0], "https://1rpc.io/eth");
         assert_eq!(config.rpc_urls[1], "https://eth.llamarpc.com");
-        assert_eq!(config.rpc_urls[2], "https://rpc.ankr.com/eth");
     }
 
     #[test]

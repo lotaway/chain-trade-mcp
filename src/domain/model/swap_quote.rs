@@ -9,6 +9,7 @@ pub struct SwapQuote {
     pub gas_estimate: String,
     pub simulation_success: bool,
     pub error_message: Option<String>,
+    pub tx_hash: Option<String>,
 }
 
 impl SwapQuote {
@@ -27,6 +28,26 @@ impl SwapQuote {
             gas_estimate,
             simulation_success: true,
             error_message: None,
+            tx_hash: None,
+        }
+    }
+
+    pub fn execution_success(
+        from_token: String,
+        to_token: String,
+        input_amount: String,
+        estimated_output: String,
+        tx_hash: String,
+    ) -> Self {
+        Self {
+            from_token,
+            to_token,
+            input_amount,
+            estimated_output,
+            gas_estimate: "0".to_string(),
+            simulation_success: true,
+            error_message: None,
+            tx_hash: Some(tx_hash),
         }
     }
 
@@ -44,6 +65,7 @@ impl SwapQuote {
             gas_estimate: "0".to_string(),
             simulation_success: false,
             error_message: Some(error),
+            tx_hash: None,
         }
     }
 }

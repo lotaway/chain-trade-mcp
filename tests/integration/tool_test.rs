@@ -85,7 +85,20 @@ mod tool_tests {
     }
 
     // Integration tests that make actual EVM RPC calls
-    // These tests require a valid .env file with RPC_URL configured
+    // These tests use a public RPC URL that doesn't require API key
+    // Using Cloudflare's Ethereum RPC endpoint
+    const PUBLIC_RPC_URL: &str = "https://cloudflare-eth.com";
+
+    fn create_test_config() -> chain_trade_mcp::config::Config {
+        use chain_trade_mcp::config::Config;
+
+        let mut config = Config::load().expect("Failed to load base config");
+
+        // Override RPC URL with a public endpoint that doesn't require API key
+        config.rpc_urls = vec![PUBLIC_RPC_URL.to_string()];
+
+        config
+    }
     #[tokio::test]
     #[serial_test::serial]
     async fn test_get_balance_eth() {

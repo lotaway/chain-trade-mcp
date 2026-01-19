@@ -3,6 +3,7 @@ pub mod repository;
 pub mod service;
 
 pub use model::balance::Balance;
+pub use model::news::{NewsArticle, NewsSearchResult};
 pub use model::swap_quote::SwapQuote;
 pub use model::token::Token;
 
