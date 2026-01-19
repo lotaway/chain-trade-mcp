@@ -30,6 +30,7 @@ moka = { version = "0.12", features = ["future"] }
 rmcp = { version = "0.9", features = ["server", "macros"] }
 schemars = "1.0"
 governor = { version = "0.6", features = ["std"] }
+rand = "0.8"
 
 [dev-dependencies]
 serial_test = "3.0"

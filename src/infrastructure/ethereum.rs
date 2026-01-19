@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::domain::{Balance, SwapQuote, Token};
 use crate::infrastructure::cache::CacheService;
 use crate::infrastructure::notification::NotificationService;
-use crate::infrastructure::rpc::{RpcConnectionPool, RpcRateLimiter};
+use crate::infrastructure::rpc::{RpcLoadBalancer, RpcRateLimiter};
 use alloy::{
     primitives::{utils::format_units, Address, U256},
     providers::{Provider, RootProvider},
@@ -16,7 +16,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::error;
-use url::Url;
 
 sol! {
     #[sol(rpc)]
@@ -28,7 +27,7 @@ sol! {
 }
 
 pub struct EthereumClient {
-    pool: Arc<RpcConnectionPool>,
+    load_balancer: Arc<RpcLoadBalancer>,
     rate_limiter: Arc<RpcRateLimiter>,
     #[allow(dead_code)]
     signer: Option<PrivateKeySigner>,
@@ -44,8 +43,8 @@ impl EthereumClient {
         notifier: NotificationService,
     ) -> Result<Self> {
         let timeout = Duration::from_secs(30);
-        let pool = Arc::new(
-            RpcConnectionPool::new(&config.rpc_url, timeout)
+        let load_balancer = Arc::new(
+            RpcLoadBalancer::new(config.rpc_urls.clone(), timeout)
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?,
         );
@@ -61,13 +60,20 @@ impl EthereumClient {
         };
 
         Ok(Self {
-            pool,
+            load_balancer,
             rate_limiter,
             signer,
             config,
             cache,
             notifier,
         })
+    }
+
+    /// Select a URL using load balancer and get its provider
+    fn select_and_get_provider(&self) -> (usize, &RootProvider<Http<Client>>) {
+        let index = self.load_balancer.select();
+        let provider = self.load_balancer.get_provider(index);
+        (index, provider)
     }
 
     pub async fn get_balance(&self, address: &str, token_address: Option<&str>) -> Result<Balance> {
@@ -105,9 +111,9 @@ impl EthereumClient {
         }
 
         let addr = Address::from_str(address)?;
-        let provider = self.pool.provider();
+        let (index, provider) = self.select_and_get_provider();
 
-        if let Some(token_addr_str) = token_address {
+        let result = if let Some(token_addr_str) = token_address {
             let token_addr = Address::from_str(token_addr_str)?;
             let contract = IERC20::new(token_addr, provider);
 
@@ -135,7 +141,16 @@ impl EthereumClient {
                 amount: balance.to_string(),
                 formatted,
             })
+        };
+
+        // Record result for load balancing
+        if result.is_ok() {
+            self.load_balancer.record_success(index);
+        } else {
+            self.load_balancer.record_error(index);
         }
+
+        result
     }
 
     pub async fn get_token_price(&self, token_address: &str) -> Result<String> {
@@ -170,7 +185,7 @@ impl EthereumClient {
 
         let usdc = Address::from_str(&self.config.usdc_address)?;
         let token = Address::from_str(token_address)?;
-        let provider = self.pool.provider();
+        let (index, provider) = self.select_and_get_provider();
 
         if token == usdc {
             return Ok("1.0".to_string());
@@ -204,6 +219,10 @@ impl EthereumClient {
             .call()
             .await?;
         let amount_out = quote.amountOut;
+
+        // Record result for load balancing
+        self.load_balancer.record_success(index);
+
         let price = format_units(amount_out, 6)?;
 
         Ok(price)
@@ -243,7 +262,7 @@ impl EthereumClient {
 
         let from = Address::from_str(from_token)?;
         let to = Address::from_str(to_token)?;
-        let provider = self.pool.provider();
+        let (index, provider) = self.select_and_get_provider();
 
         let from_contract = IERC20::new(from, provider);
         let decimals = from_contract.decimals().call().await?._0;
@@ -297,6 +316,9 @@ impl EthereumClient {
         let output = provider.call(&tx).await?;
         let amount_out = U256::from_be_slice(&output);
 
+        // Record success
+        self.load_balancer.record_success(index);
+
         let to_contract = IERC20::new(to, provider);
         let to_decimals = to_contract.decimals().call().await?._0;
         let formatted_out = format_units(amount_out, to_decimals)?;
@@ -322,5 +344,19 @@ impl EthereumClient {
             simulation_success: true,
             error_message: None,
         })
+    }
+
+    /// Get load balancer statistics (for debugging/monitoring)
+    #[allow(dead_code)]
+    pub fn get_load_balancer_stats(&self) -> Vec<(String, usize, f64)> {
+        let mut stats = Vec::new();
+        for i in 0..self.load_balancer.len() {
+            stats.push((
+                self.load_balancer.get_url(i).to_string(),
+                self.load_balancer.get_error_count(i),
+                self.load_balancer.get_weight(i),
+            ));
+        }
+        stats
     }
 }

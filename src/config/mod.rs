@@ -4,7 +4,7 @@ use std::env;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub rpc_url: String,
+    pub rpc_urls: Vec<String>,
     pub private_key: Option<String>,
     pub port: u16,
     pub default_slippage: f64,
@@ -28,10 +28,22 @@ impl Config {
     pub fn load() -> Result<Self> {
         dotenv().ok();
 
-        let rpc_url = env::var("RPC_URL")
+        // Parse RPC URLs from comma-separated list
+        let rpc_urls: Vec<String> = env::var("RPC_URL")
             .ok()
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "https://1rpc.io/eth".to_string());
+            .unwrap_or_else(|| "https://1rpc.io/eth".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        // Fallback to single default if none provided
+        let rpc_urls = if rpc_urls.is_empty() {
+            vec!["https://1rpc.io/eth".to_string()]
+        } else {
+            rpc_urls
+        };
 
         let private_key = env::var("PRIVATE_KEY").ok().filter(|k| !k.is_empty());
 
@@ -95,7 +107,7 @@ impl Config {
             .unwrap_or(1000);
 
         Ok(Config {
-            rpc_url,
+            rpc_urls,
             private_key,
             port,
             default_slippage,
@@ -112,5 +124,45 @@ impl Config {
             rate_limit_max_tokens,
             rate_limit_refill_interval_ms,
         })
+    }
+}
+
+use alloy::providers::RootProvider;
+use alloy::transports::http::{Client, Http};
+use std::sync::Arc;
+use std::time::Duration;
+use url::Url;
+
+/// Single RPC connection pool for one URL
+#[derive(Clone)]
+pub struct RpcConnectionPool {
+    provider: Arc<RootProvider<Http<Client>>>,
+    timeout: Duration,
+    url: String,
+}
+
+impl RpcConnectionPool {
+    pub async fn new(rpc_url: &str, timeout: Duration) -> Result<Self, String> {
+        let url = Url::parse(rpc_url).map_err(|e| format!("Invalid RPC URL: {}", e))?;
+
+        let provider = alloy::providers::ProviderBuilder::new().on_http(url);
+
+        Ok(Self {
+            provider: Arc::new(provider),
+            timeout,
+            url: rpc_url.to_string(),
+        })
+    }
+
+    pub fn provider(&self) -> &RootProvider<Http<Client>> {
+        &self.provider
+    }
+
+    pub fn timeout(&self) -> Duration {
+        self.timeout
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
     }
 }

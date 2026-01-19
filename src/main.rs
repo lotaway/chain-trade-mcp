@@ -26,7 +26,18 @@ async fn main() -> anyhow::Result<()> {
     info!("Starting Ethereum Trading MCP Server...");
 
     let config = Config::load()?;
-    info!("Configuration loaded. RPC URL: {}", config.rpc_url);
+    info!(
+        "Configuration loaded. RPC URLs count: {}",
+        config.rpc_urls.len()
+    );
+    if config.rpc_urls.len() == 1 {
+        info!("Using single RPC URL: {}", config.rpc_urls[0]);
+    } else {
+        info!(
+            "Using {} RPC URLs with load balancing",
+            config.rpc_urls.len()
+        );
+    }
     info!(
         "Server configured for port: {} (MCP uses stdio)",
         config.port
