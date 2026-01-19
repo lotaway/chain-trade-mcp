@@ -1,6 +1,6 @@
-# Ethereum Trading MCP Server
+# Web3 AI Quant Agent – MCP Tool Spec
 
-An MCP (Model Context Protocol) server implemented in Rust using the official `rmcp` SDK. Enables AI agents to interact with the Ethereum blockchain for querying balances, checking token prices, and simulating Uniswap token swaps.
+Provides real, executable, and auditable on-chain and market capabilities for Web3 quantitative agents, used for automated trading and risk control.
 
 ## Features
 
@@ -13,7 +13,7 @@ An MCP (Model Context Protocol) server implemented in Rust using the official `r
 ### Prerequisites
 
 - Rust (latest stable)
-- An Ethereum RPC URL, already set a public free RPC URL inside the `src/config/mod.rs`, but a paid RPC URL will be better (e.g., from Alchemy or Infura)
+- An Ethereum RPC URL. A public free RPC URL is already configured in `src/config/mod.rs`, but a paid RPC URL is recommended for better performance (e.g., from Alchemy or Infura)
 
 ### Configuration
 
@@ -33,7 +33,7 @@ An MCP (Model Context Protocol) server implemented in Rust using the official `r
 
 ### Building
 
-Build the release version:
+Build the release version: 
 
 ```bash
 cargo build --release
@@ -138,11 +138,11 @@ cargo test
 
 All 43 tests should pass.
 
-## Code Priceples
+## Code Examples
 
-Follow the code priceples in file:`CODE_PINCEPLES/CODE_PRICEPLES`
+Follow the code examples in file: `CODE_PINCEPLES/CODE_PRICEPLES`
 
-## Direcotry Structure
+## Directory Structure
 
 ```
 src/
