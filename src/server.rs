@@ -1,4 +1,5 @@
 use crate::infrastructure::ethereum::EthereumClient;
+use crate::infrastructure::swap_executor::SwapExecutor;
 use rmcp::{
     handler::server::wrapper::Parameters,
     handler::server::{tool::ToolRouter, ServerHandler},
@@ -31,7 +32,7 @@ pub struct PriceRequest {
     pub token: String,
 }
 
-/// Token swap simulation request parameters
+/// Token swap request parameters
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct SwapRequest {
     /// Source token address (use native token address for ETH)
@@ -42,6 +43,12 @@ pub struct SwapRequest {
     pub amount: String,
     /// Optional slippage tolerance (e.g., 0.5 for 0.5%). Defaults to configured value.
     pub slippage: Option<f64>,
+    /// Optional maximum amount to spend
+    pub max_spend: Option<String>,
+    /// Optional minimum amount to receive
+    pub min_receive: Option<String>,
+    /// Set to true to execute real swap; default false for simulation
+    pub execute: Option<bool>,
 }
 
 #[tool_router]
@@ -85,21 +92,42 @@ impl ChainTradeServer {
             .map_err(|e| format!("Failed to serialize price: {}", e))
     }
 
-    /// Simulate a token swap on Uniswap V3
     #[tool(
-        description = "Simulate a token swap on Uniswap V3 to estimate output and gas costs (does not execute)"
+        description = "Swap tokens on Uniswap V3. Set execute=true for real tx, otherwise simulate."
     )]
     async fn swap_tokens(&self, params: Parameters<SwapRequest>) -> Result<String, String> {
         let req = params.0;
+        let do_execute = req.execute.unwrap_or(false);
 
-        let swap_result = self
-            .eth_client
-            .simulate_swap(&req.from_token, &req.to_token, &req.amount, req.slippage)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        serde_json::to_string_pretty(&swap_result)
-            .map_err(|e| format!("Failed to serialize swap result: {}", e))
+        if do_execute {
+            let signer = self
+                .eth_client
+                .get_signer()
+                .ok_or_else(|| "PRIVATE_KEY not configured".to_string())?;
+            let executor = SwapExecutor::new(signer.clone(), self.eth_client.get_config().clone());
+            let result = executor
+                .execute_swap(
+                    &req.from_token,
+                    &req.to_token,
+                    &req.amount,
+                    req.slippage,
+                    req.max_spend.as_deref(),
+                    req.min_receive.as_deref(),
+                    self.eth_client.get_provider(),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|e| format!("Failed to serialize swap result: {}", e))
+        } else {
+            let result = self
+                .eth_client
+                .simulate_swap(&req.from_token, &req.to_token, &req.amount, req.slippage)
+                .await
+                .map_err(|e| e.to_string())?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|e| format!("Failed to serialize swap result: {}", e))
+        }
     }
 }
 
