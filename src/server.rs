@@ -1,3 +1,4 @@
+use crate::domain::service::news_service::{NewsRepository, NewsService};
 use crate::infrastructure::ethereum::EthereumClient;
 use crate::infrastructure::swap_executor::SwapExecutor;
 use rmcp::{
@@ -49,6 +50,19 @@ pub struct SwapRequest {
     pub min_receive: Option<String>,
     /// Set to true to execute real swap; default false for simulation
     pub execute: Option<bool>,
+    /// Router address (required for execute=true; only Uniswap supported)
+    pub router_address: Option<String>,
+}
+
+/// News search request parameters
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct NewsRequest {
+    /// Search query (e.g., 'ethereum', 'bitcoin')
+    pub query: String,
+    /// Maximum number of articles to return (default: 10, max: 20)
+    pub limit: Option<u32>,
+    /// Source: 'rss' or 'cryptopanic' (default: rss)
+    pub source: Option<String>,
 }
 
 #[tool_router]
@@ -98,8 +112,21 @@ impl ChainTradeServer {
     async fn swap_tokens(&self, params: Parameters<SwapRequest>) -> Result<String, String> {
         let req = params.0;
         let do_execute = req.execute.unwrap_or(false);
-
         if do_execute {
+            // Enforce input constraints for real execution
+            if req.slippage.is_none() {
+                return Err("slippage is required for real execution".to_string());
+            }
+            if req.max_spend.is_none() && req.min_receive.is_none() {
+                return Err("either max_spend or min_receive is required".to_string());
+            }
+            let router_address = req
+                .router_address
+                .ok_or_else(|| "router_address is required (only Uniswap supported)".to_string())?;
+            if router_address != self.eth_client.get_config().uniswap_router_address {
+                return Err("unsupported router_address".to_string());
+            }
+
             let signer = self
                 .eth_client
                 .get_signer()
@@ -128,6 +155,19 @@ impl ChainTradeServer {
             serde_json::to_string_pretty(&result)
                 .map_err(|e| format!("Failed to serialize swap result: {}", e))
         }
+    }
+
+    /// Search for cryptocurrency news (returns raw articles without summarization)
+    #[tool(description = "Search for cryptocurrency news from RSS feeds and public APIs")]
+    async fn news_search(&self, params: Parameters<NewsRequest>) -> Result<String, String> {
+        let req = params.0;
+        let service = NewsService::new();
+        let result = service
+            .search_news(&req.query, req.limit, req.source.as_deref())
+            .await
+            .map_err(|e| e)?;
+        serde_json::to_string_pretty(&result)
+            .map_err(|e| format!("Failed to serialize news result: {}", e))
     }
 }
 

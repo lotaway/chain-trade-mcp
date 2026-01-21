@@ -191,13 +191,11 @@ impl SwapExecutor {
         let current_allowance = contract.allowance(owner, spender).call().await?._0;
 
         if current_allowance < amount {
-            let calldata = contract.approve(spender, amount).calldata().to_owned();
-            let tx_request = TransactionRequest::default()
-                .from(owner)
-                .to(token)
-                .input(calldata.into());
-
-            let _pending = provider.send_transaction(tx_request).await?;
+            return Err(anyhow::anyhow!(
+                "Insufficient allowance. Current: {}, Required: {}. Please pre-approve before execution to ensure single transaction.",
+                current_allowance,
+                amount
+            ));
         }
 
         Ok(())
