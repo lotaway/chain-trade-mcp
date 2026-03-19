@@ -1,0 +1,26 @@
+# Order Match Service Configuration
+
+[app]
+name = "order-match"
+# options: trace, debug, info, warn, error
+log_level = "info"
+
+[kafka]
+brokers = "localhost:9092"
+topic = "dex-trades"
+producer_timeout_ms = 5000
+producer_retry_count = 3
+
+[dubbo]
+port = 20086
+registry_address = "127.0.0.1:2181"
+group = "/metawebthree"
+version = ""
+
+[storage]
+# WAL (Write-Ahead Log) directory
+wal_dir = "/tmp"
+
+[markets]
+# Supported market list
+markets = ["BTC/USDT", "ETH/USDT", "DOGE/USDT"]
