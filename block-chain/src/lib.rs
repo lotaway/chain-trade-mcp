@@ -1,125 +1,21 @@
 mod block;
-
-pub use crate::block::Block;
-// use axum::extract::FromRef;
-pub use crate::block::BlockChain;
-
 mod transaction;
 mod hashable;
 
-pub use crate::transaction::Transaction;
+pub use crate::block::{Block, BlockChain};
+pub use crate::transaction::{Transaction, Output};
 
-pub mod lib {
-    use std::{thread, time};
+
+pub type BlockHash = Vec<u8>;
+pub type Address = String;
+
+pub mod time {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    pub type BlockHash = Vec<u8>;
-
-    pub type Address = String;
-
-    pub fn now() -> u128 {
-        let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        duration.as_secs() as u128 * 1000 + duration.subsec_micros() as u128
-    }
-
-    pub fn sleep(time: u64) {
-        thread::sleep(time::Duration::from_millis(time));
-    }
-
-    pub fn u32_bytes(u: &u32) -> [u8; 4] {
-        [
-            (u >> 8 * 0x0) as u8,
-            (u >> 8 * 0x1) as u8,
-            (u >> 8 * 0x2) as u8,
-            (u >> 8 * 0x3) as u8,
-        ]
-    }
-
-    pub fn u64_bytes(u: &u64) -> [u8; 8] {
-        [
-            (u >> 8 * 0x0) as u8,
-            (u >> 8 * 0x1) as u8,
-            (u >> 8 * 0x2) as u8,
-            (u >> 8 * 0x3) as u8,
-            (u >> 8 * 0x4) as u8,
-            (u >> 8 * 0x5) as u8,
-            (u >> 8 * 0x6) as u8,
-            (u >> 8 * 0x7) as u8,
-        ]
-    }
-
-    pub fn u128_bytes(u: &u128) -> [u8; 16] {
-        [
-            (u >> 8 * 0x0) as u8,
-            (u >> 8 * 0x1) as u8,
-            (u >> 8 * 0x2) as u8,
-            (u >> 8 * 0x3) as u8,
-            (u >> 8 * 0x4) as u8,
-            (u >> 8 * 0x5) as u8,
-            (u >> 8 * 0x6) as u8,
-            (u >> 8 * 0x7) as u8,
-            (u >> 8 * 0x8) as u8,
-            (u >> 8 * 0x9) as u8,
-            (u >> 8 * 0xa) as u8,
-            (u >> 8 * 0xb) as u8,
-            (u >> 8 * 0xc) as u8,
-            (u >> 8 * 0xd) as u8,
-            (u >> 8 * 0xe) as u8,
-            (u >> 8 * 0xf) as u8,
-        ]
-    }
-
-    pub fn difficulty_bytes_as_u128(v: &Vec<u8>) -> u128 {
-        ((v[31] as u128) << 0xf * 8) |
-            ((v[30] as u128) << 0xe * 8) |
-            ((v[29] as u128) << 0xd * 8) |
-            ((v[28] as u128) << 0xc * 8) |
-            ((v[27] as u128) << 0xb * 8) |
-            ((v[26] as u128) << 0xa * 8) |
-            ((v[25] as u128) << 0x9 * 8) |
-            ((v[24] as u128) << 0x8 * 8) |
-            ((v[23] as u128) << 0x7 * 8) |
-            ((v[22] as u128) << 0x6 * 8) |
-            ((v[21] as u128) << 0x5 * 8) |
-            ((v[20] as u128) << 0x4 * 8) |
-            ((v[19] as u128) << 0x3 * 8) |
-            ((v[18] as u128) << 0x2 * 8) |
-            ((v[17] as u128) << 0x1 * 8) |
-            ((v[16] as u128) << 0x0 * 8)
-    }
-
-    pub fn get_words(content: &str) -> Vec<String> {
-        content.lines()
-            .filter(|line| !line.is_empty())
-            .flat_map(|line| line.split_whitespace())
-            .map(|word| word.to_lowercase())
-            .collect::<Vec<String>>()
+    pub fn now_ms() -> u128 {
+        let duration = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+        duration.as_millis() as u128
     }
 }
-
-/*#[derive(FromRef, Clone)]
-pub struct AppState {
-    pub db_pool: AsyncConnectPool,
-    pub signing_keys: uchat_crypto::sign::Keys,
-    pub rng: rand::rngs::StdRng,
-}
-
-impl AppState {
-    pub async fn connect(&self) -> Result<AsyncConnection, QueryError> {
-        self.db_pool.get().await
-    }
-}
-
-impl FromRef<AppState> for AppState {
-    fn from_ref(input: &AppState) -> Self {
-        AppState {
-            db_pool: input.db_pool,
-            signing_keys: input.signing_keys,
-            rng: input.rng,
-        }
-    }
-}
-
-pub mod cli {
-    pub fn gen_keys<R>(rng: &mut R) -> color_eyre::Result<(EncodedPrivateKey, Keys)> where R: CryptoRng + RngCore, {}
-}*/

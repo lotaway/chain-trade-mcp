@@ -14,3 +14,7 @@ hyper = "^1.0.0-rc.3"
 sha3 = "0.10.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# GUI dependencies - using latest version for macOS compatibility
+eframe = "0.29"
+egui = "0.29"
