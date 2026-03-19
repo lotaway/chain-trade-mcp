@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package com.metawebthree.common.generated.rpc;
+
+// option cc_enable_arenas = true;
+option java_multiple_files = true;
+
+service OrderMatchService {
+    rpc addOrder(AddOrderMatchRequest) returns (AddOrderMatchResponse);
+}
+
+message AddOrderMatchRequest {
+    repeated OrderMatchDTO orders = 1;
+}
+
+message AddOrderMatchResponse {
+    bool success = 1;
+    string message = 2;
+    repeated OrderMatchedTrade trades = 3;
+    double remaining = 4;
+}
+
+message OrderMatchedTrade {
+    int64 id = 1;
+}
+
+enum Side {
+    Buy = 0;
+    Sell = 1;
+}
+
+enum OrderKind {
+    Limit = 0;
+    Market = 1;
+}
+
+message OrderMatchDTO {
+    string market = 1;
+    string chain = 2;
+    string order_id = 3;
+    Side side = 4;
+    OrderKind kind = 5;
+    optional double price = 6;
+    double quantity = 7;
+}
